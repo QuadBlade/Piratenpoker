@@ -56,8 +56,11 @@
   .msg.ok{color:var(--pen)}
   .msg.ok::before{content:'\2713 '}
 
-  .menu-btn{display:flex;align-items:center;justify-content:space-between;width:100%;padding:18px;border:1.5px solid var(--ink);border-radius:6px;background:var(--sheet);margin-bottom:12px;font-size:1.15rem;font-weight:600;text-align:left}
+  .menu-btn{display:flex;align-items:center;gap:14px;width:100%;padding:18px;border:1.5px solid var(--ink);border-radius:6px;background:var(--sheet);margin-bottom:12px;font-size:1.15rem;font-weight:600;text-align:left}
+  .menu-icon{flex:none;width:1.5em;text-align:center;font-size:1.6rem;line-height:1}
+  .menu-text{flex:1;min-width:0}
   .menu-btn small{display:block;font-weight:400;font-size:.9rem;color:var(--muted);margin-top:3px}
+  .menu-arrow{flex:none}
 
   .sectitle{font-family:var(--serif);font-size:1.2rem;font-weight:700;margin:24px 0 10px}
   .sectitle:first-child{margin-top:0}
@@ -163,12 +166,13 @@
     return e;
   }
   function fmt(n){ return String(n).replace('-','−'); }
-  function makeMenuBtn(title,sub){
+  function makeMenuBtn(icon,title,sub){
     var span=document.createElement('span');
+    span.className='menu-text';
     span.appendChild(document.createTextNode(title));
     var small=document.createElement('small'); small.textContent=sub;
     span.appendChild(small);
-    var btn=el('button',{type:'button',class:'menu-btn'},[span, el('span',{text:'→'})]);
+    var btn=el('button',{type:'button',class:'menu-btn'},[el('span',{class:'menu-icon','aria-hidden':'true',text:icon}), span, el('span',{class:'menu-arrow',text:'→'})]);
     return btn;
   }
 
@@ -263,11 +267,11 @@
     box.appendChild(el('h1',{class:'brand',text:'Piratenpoker'}));
     box.appendChild(el('p',{class:'lead',text:'Angemeldet als '+(state.profile?state.profile.display_name:'')+' ('+state.session.user.email+')'}));
 
-    var newGameBtn=makeMenuBtn('Neues Spiel','Mitspieler auswählen und loslegen');
+    var newGameBtn=makeMenuBtn('🎲','Neues Spiel','Mitspieler auswählen und loslegen');
     newGameBtn.addEventListener('click',function(){ openSetup(); });
-    var histBtn=makeMenuBtn('Verlauf','Vergangene Partien ansehen');
+    var histBtn=makeMenuBtn('📜','Verlauf','Vergangene Partien ansehen');
     histBtn.addEventListener('click',function(){ openHistory(); });
-    var friendsBtn=makeMenuBtn('Freunde','Mitspieler einladen und verwalten');
+    var friendsBtn=makeMenuBtn('🤝','Freunde','Mitspieler einladen und verwalten');
     friendsBtn.addEventListener('click',function(){ openFriends(); });
     box.appendChild(newGameBtn); box.appendChild(histBtn); box.appendChild(friendsBtn);
 
