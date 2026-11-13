@@ -126,3 +126,6 @@ create policy "games_delete_own"
 
 create index if not exists games_created_by_idx on public.games(created_by);
 create index if not exists games_players_gin_idx on public.games using gin (players);
+
+-- Migration: Startplatz des Gebers (wird ausgewuerfelt, rotiert danach pro Zeile reihum)
+alter table public.games add column if not exists start_dealer_seat integer;

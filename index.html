@@ -18,6 +18,7 @@
   body{display:flex;flex-direction:column;height:100dvh}
   button{font:inherit;color:inherit;cursor:pointer}
   :focus-visible{outline:2px solid var(--pen);outline-offset:1px}
+  #app{display:flex;flex-direction:column;height:100%;min-height:0}
 
   /* ---------- Views (Auth/Home/Friends/History/Setup) ---------- */
   .view{max-width:440px;width:100%;margin:0 auto;padding:max(28px,env(safe-area-inset-top)) 20px 40px;overflow:auto}
@@ -75,7 +76,7 @@
   .topbar h1{font-family:var(--serif);font-size:1.1rem;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .topbar button{background:none;border:1.5px solid var(--ink);border-radius:6px;padding:6px 10px;font-size:.85rem;white-space:nowrap}
   .finished-note{text-align:center;font-size:.8rem;color:#55555f;padding:6px 0 0}
-  #sheet{flex:1;overflow:auto;background:var(--sheet);-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  #sheet{flex:1;min-height:0;overflow:auto;background:var(--sheet);-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
   table{border-collapse:separate;border-spacing:0;min-width:100%;table-layout:fixed}
   col.lab{width:58px}
   col.pl{width:calc((100vw - 58px)/4);min-width:82px}
@@ -83,8 +84,10 @@
   thead th{position:sticky;top:0;z-index:3;border-bottom:2px solid var(--ink);background:var(--paper);font-family:var(--serif);font-weight:700;font-size:1rem;text-align:center;padding:11px 4px;color:var(--ink)}
   .lab-c{position:sticky;left:0;z-index:2;text-align:center;font-family:var(--serif);font-size:1.15rem;font-weight:700;border-right:2px solid var(--ink)!important;background:var(--paper)}
   thead .lab-c{z-index:4}
-  tfoot td{position:sticky;bottom:0;z-index:3;background:var(--paper);border-top:2px solid var(--ink);border-bottom:0;text-align:center;padding:8px 2px}
-  tfoot .lab-c{z-index:4;font-size:.8rem;font-family:var(--sans);font-weight:600;color:#55555f}
+  .totalbar{flex:none;overflow:hidden;border-top:2px solid var(--ink);background:var(--paper)}
+  .totalbar table{border-collapse:separate;border-spacing:0;table-layout:fixed}
+  .totalbar td{border:0;background:var(--paper);text-align:center;padding:8px 2px}
+  .totalbar .lab-c{font-size:.8rem;font-family:var(--sans);font-weight:600;color:#55555f}
   tr.w td, tr.w .lab-c{background:var(--tint)}
   tr.w .lab-c{font-size:1.05rem;color:var(--pen)}
   tr.x td{background:#F1F0F4}
@@ -103,6 +106,7 @@
   .c:focus-within .tools{display:flex}
   .c:focus-within .s{display:none}
   .tools button{width:30px;height:22px;padding:0;border:1px solid var(--pen);background:var(--sheet);color:var(--pen);border-radius:4px;font-size:.9rem;line-height:1;font-weight:700}
+  .dealer-mark{position:absolute;top:3px;right:3px;width:15px;height:15px;border-radius:50%;border:1.2px solid var(--pen);color:var(--pen);background:var(--sheet);font-family:var(--sans);font-size:.6rem;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;pointer-events:none}
 
   .ring{display:inline-flex;align-items:center;justify-content:center;min-width:52px;height:52px;padding:0 6px;border:2.5px solid var(--ink);border-radius:50%;font-family:var(--serif);font-size:1.15rem;font-weight:700;font-variant-numeric:tabular-nums;background:var(--sheet)}
   .ring.lead{background:var(--ink);color:var(--sheet)}
@@ -410,7 +414,8 @@
       setupGuests.forEach(function(g){ var nm=g.trim(); if(nm) players.push({profile_id:null, guest_name:nm, display_name:nm}); });
       var scores=ROWS.map(function(){ return players.map(function(){ return null; }); });
       var title=titleField.value.trim() || new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
-      sb.from('games').insert({created_by:state.session.user.id, title:title, players:players, scores:scores}).select().single().then(function(res){
+      var startDealerSeat=Math.floor(Math.random()*players.length);
+      sb.from('games').insert({created_by:state.session.user.id, title:title, players:players, scores:scores, start_dealer_seat:startDealerSeat}).select().single().then(function(res){
         start.disabled=false;
         if(res.error){ alert(res.error.message); return; }
         state.currentGame=res.data; state.view='game'; render();
@@ -432,6 +437,13 @@
     var game=state.currentGame;
     var players=game.players, n=players.length;
     inputs=[]; sums=[]; rings=[];
+
+    var dealerSeat = (typeof game.start_dealer_seat==='number') ? game.start_dealer_seat : null;
+    if(dealerSeat===null){
+      dealerSeat = Math.floor(Math.random()*n);
+      game.start_dealer_seat = dealerSeat;
+      sb.from('games').update({start_dealer_seat:dealerSeat}).eq('id',game.id).then(function(res){ if(res.error) console.error(res.error); });
+    }
 
     var back=el('button',{type:'button',text:'← Start'});
     back.addEventListener('click',function(){ flushSave(); state.currentGame=null; state.view='home'; render(); });
@@ -475,9 +487,11 @@
       var tr=el('tr',{class:(row.w?'w ':'')+(row.x?'x ':'')+(row.sep?'sep':'')});
       tr.appendChild(el('th',{class:'lab-c',text:row.l,scope:'row'}));
       inputs[r]=[]; sums[r]=[];
+      var dealerForRow = (dealerSeat + r) % n;
       for(var p=0;p<n;p++){
         (function(r,p){
-          var inp=el('input',{class:'v',type:'text',inputmode:'numeric',autocomplete:'off',enterkeyhint:'next','aria-label':'Runde '+row.l+', '+players[p].display_name});
+          var isDealer = p===dealerForRow;
+          var inp=el('input',{class:'v',type:'text',inputmode:'numeric',autocomplete:'off',enterkeyhint:'next','aria-label':'Runde '+row.l+', '+players[p].display_name+(isDealer?', Geber':'')});
           if(!editable) inp.disabled=true;
           var v=game.scores[r][p];
           inp.value = (v===null||v===undefined) ? '' : String(v);
@@ -498,7 +512,9 @@
             inp.addEventListener('blur',function(){ flushSave(); });
           }
           inp.addEventListener('focus',function(){ setTimeout(function(){ inp.select(); },0); inp.parentNode.scrollIntoView({block:'nearest',inline:'nearest'}); });
-          var c=el('div',{class:'c'},[inp,s,tools]);
+          var cKids=[inp,s,tools];
+          if(isDealer) cKids.push(el('span',{class:'dealer-mark',title:'Geber','aria-hidden':'true',text:'G'}));
+          var c=el('div',{class:'c'},cKids);
           tr.appendChild(el('td',{},[c]));
           inputs[r][p]=inp; sums[r][p]=s;
         })(r,p);
@@ -507,14 +523,21 @@
     });
     table.appendChild(tbody);
 
-    var tfoot=el('tfoot'), fr=el('tr');
-    fr.appendChild(el('td',{class:'lab-c',text:'Summe'}));
-    for(var q=0;q<n;q++){ var ring=el('span',{class:'ring',text:'0'}); rings[q]=ring; fr.appendChild(el('td',{},[ring])); }
-    tfoot.appendChild(fr); table.appendChild(tfoot);
-
     var sheet=el('div',{id:'sheet'},[table]);
     app.appendChild(sheet);
     if(n>4) table.style.width=(58+n*82)+'px';
+
+    var totalCg=el('colgroup',{},[el('col',{class:'lab'})]);
+    for(var q=0;q<n;q++) totalCg.appendChild(el('col',{class:'pl'}));
+    var totalTr=el('tr');
+    totalTr.appendChild(el('td',{class:'lab-c',text:'Summe'}));
+    for(q=0;q<n;q++){ var ring=el('span',{class:'ring',text:'0'}); rings[q]=ring; totalTr.appendChild(el('td',{},[ring])); }
+    var totalTable=el('table',{},[totalCg, el('tbody',{},[totalTr])]);
+    var totalbar=el('div',{class:'totalbar'},[totalTable]);
+    app.appendChild(totalbar);
+    if(n>4) totalTable.style.width=(58+n*82)+'px';
+    sheet.addEventListener('scroll',function(){ totalbar.scrollLeft = sheet.scrollLeft; });
+
     update();
   }
 
